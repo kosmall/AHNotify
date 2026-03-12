@@ -59,10 +59,35 @@ local function CreateLogRows(parent, scrollFrame)
         row.typeText:SetWidth(60)
         row.typeText:SetJustifyH("CENTER")
 
+        -- Search button (for restock entries)
+        row.searchBtn = CreateFrame("Button", "AHNotifyLogRowSearch" .. i, row, "UIPanelButtonTemplate")
+        row.searchBtn:SetSize(20, LOG_ROW_HEIGHT)
+        row.searchBtn:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+        row.searchBtn:SetText("\124TInterface\\COMMON\\UI-Searchbox-Icon:14:14\124t")
+        row.searchBtn:SetScript("OnClick", function()
+            local itemLink = row.entryItemLink
+            if itemLink then
+                HandleModifiedItemClick(itemLink)
+            end
+            -- Remove this entry from the log
+            if row.entryRef then
+                ns:RemoveFromLog(row.entryRef)
+            end
+        end)
+        row.searchBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Search in AH", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        row.searchBtn:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        row.searchBtn:Hide()
+
         -- Message
         row.msgText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         row.msgText:SetPoint("LEFT", row, "LEFT", 120, 0)
-        row.msgText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        row.msgText:SetPoint("RIGHT", row.searchBtn, "LEFT", -2, 0)
         row.msgText:SetJustifyH("LEFT")
         row.msgText:SetWordWrap(false)
 
@@ -90,9 +115,23 @@ local function UpdateLogList()
             row.typeText:SetText(TYPE_LABELS[entry.logType] or entry.logType)
             row.typeText:SetTextColor(typeColor.r, typeColor.g, typeColor.b)
             row.msgText:SetText(entry.text)
+
+            -- Show search button only for restock entries with an item link
+            if entry.logType == "restock" and entry.itemLink then
+                row.entryItemLink = entry.itemLink
+                row.entryRef = entry
+                row.searchBtn:Show()
+            else
+                row.entryItemLink = nil
+                row.entryRef = nil
+                row.searchBtn:Hide()
+            end
+
             row:Show()
         else
             row:Hide()
+            row.searchBtn:Hide()
+            row.entryRef = nil
         end
     end
 
@@ -176,7 +215,40 @@ function ns:ToggleNotificationLogFrame()
     end
 end
 
+-- Persistent global button for /click AHNotifyRestockFirst macro support
+-- Created once with the proper name so /click can find it; OnClick updated dynamically
+local restockFirstBtn = CreateFrame("Button", "AHNotifyRestockFirst", UIParent)
+restockFirstBtn:SetSize(1, 1)
+restockFirstBtn:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -100, 100)
+restockFirstBtn:SetAlpha(0)
+restockFirstBtn:EnableMouse(false)
+restockFirstBtn:RegisterForClicks("AnyDown", "AnyUp")
+restockFirstBtn:Show()
+
+local function UpdateRestockFirstGlobal()
+    local log = ns:GetNotificationLog()
+    -- Find the newest restock entry with an item link
+    local found = nil
+    for i = #log, 1, -1 do
+        if log[i].logType == "restock" and log[i].itemLink then
+            found = log[i]
+            break
+        end
+    end
+    restockFirstBtn.entryItemLink = found and found.itemLink or nil
+    restockFirstBtn.entryRef = found
+    restockFirstBtn:SetScript("OnClick", function()
+        if restockFirstBtn.entryItemLink then
+            HandleModifiedItemClick(restockFirstBtn.entryItemLink)
+        end
+        if restockFirstBtn.entryRef then
+            ns:RemoveFromLog(restockFirstBtn.entryRef)
+        end
+    end)
+end
+
 function ns:UpdateNotificationLogFrame()
+    UpdateRestockFirstGlobal()
     if AHNotifyLogFrame and AHNotifyLogFrame:IsShown() then
         UpdateLogList()
     end

@@ -11,11 +11,12 @@ local COLORS = {
 -- Notification history log
 local notificationLog = {}
 
-function ns:AddToLog(logType, text)
+function ns:AddToLog(logType, text, itemLink)
     table.insert(notificationLog, {
         logType = logType,
         text = text,
         timestamp = date("%H:%M:%S"),
+        itemLink = itemLink,
     })
     if ns.UpdateNotificationLogFrame then
         ns:UpdateNotificationLogFrame()
@@ -28,6 +29,18 @@ end
 
 function ns:ClearNotificationLog()
     wipe(notificationLog)
+    if ns.UpdateNotificationLogFrame then
+        ns:UpdateNotificationLogFrame()
+    end
+end
+
+function ns:RemoveFromLog(entry)
+    for i = #notificationLog, 1, -1 do
+        if notificationLog[i] == entry then
+            table.remove(notificationLog, i)
+            break
+        end
+    end
     if ns.UpdateNotificationLogFrame then
         ns:UpdateNotificationLogFrame()
     end
@@ -100,7 +113,7 @@ function ns:NotifyRestock(itemRef, buyoutPrice, soldCount)
     msg = msg .. " - all " .. soldCount .. " auction(s) sold!"
     msg = msg .. " (was " .. self:FormatMoney(buyoutPrice) .. " each)"
     self:Print(msg)
-    self:AddToLog("restock", msg)
+    self:AddToLog("restock", msg, itemRef)
     PlaySound(SOUNDKIT.RAID_WARNING or 8959)
 end
 
